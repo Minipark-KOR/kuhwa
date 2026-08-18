@@ -1,0 +1,74 @@
+// /api/schedule.js
+// Vercel Serverless Function
+// 한국구화학교(NEIS) 학사일정을 조회하여 JSON으로 반환합니다.
+
+const ATPT_OFCDC_SC_CODE = "B10"; // 서울특별시교육청
+const SD_SCHUL_CODE = "7010473"; // 한국구화학교
+
+module.exports = async (req, res) => {
+  const apiKey = process.env.NEIS_API_KEY;
+
+  if (!apiKey) {
+    res.status(500).json({ error: "NEIS_API_KEY 환경변수가 설정되어 있지 않습니다." });
+    return;
+  }
+
+  const { year, from, to } = req.query || {};
+  const targetYear = year || String(new Date().getFullYear());
+
+  const params = new URLSearchParams({
+    KEY: apiKey,
+    Type: "json",
+    pIndex: "1",
+    pSize: "1000",
+    ATPT_OFCDC_SC_CODE,
+    SD_SCHUL_CODE,
+    AY: targetYear,
+  });
+
+  if (from) params.set("AA_FROM_YMD", from);
+  if (to) params.set("AA_TO_YMD", to);
+
+  const url = `https://open.neis.go.kr/hub/SchoolSchedule?${params.toString()}`;
+
+  try {
+    const response = await fetch(url);
+    const data = await response.json();
+
+    const rows = data?.SchoolSchedule?.[1]?.row;
+
+    if (!rows) {
+      // 해당 데이터가 없는 경우에도 정상 응답으로 빈 배열 반환
+      res.setHeader("Cache-Control", "s-maxage=3600, stale-while-revalidate");
+      res.status(200).json({ school: "한국구화학교", year: targetYear, events: [] });
+      return;
+    }
+
+    // 같은 날짜/행사명이 학교급(초/중/고 등)별로 중복 등록되므로 날짜+행사명 기준으로 합칩니다.
+    const merged = new Map();
+    for (const row of rows) {
+      const key = `${row.AA_YMD}_${row.EVENT_NM}`;
+      if (!merged.has(key)) {
+        merged.set(key, {
+          date: row.AA_YMD,
+          name: row.EVENT_NM,
+          content: (row.EVENT_CNTNT || "").trim(),
+          type: row.SBTR_DD_SC_NM,
+          courses: [row.SCHUL_CRSE_SC_NM].filter(Boolean),
+        });
+      } else {
+        const existing = merged.get(key);
+        if (row.SCHUL_CRSE_SC_NM && !existing.courses.includes(row.SCHUL_CRSE_SC_NM)) {
+          existing.courses.push(row.SCHUL_CRSE_SC_NM);
+        }
+      }
+    }
+
+    const events = Array.from(merged.values()).sort((a, b) => a.date.localeCompare(b.date));
+
+    res.setHeader("Cache-Control", "s-maxage=3600, stale-while-revalidate");
+    res.status(200).json({ school: "한국구화학교", year: targetYear, events });
+  } catch (err) {
+    res.status(502).json({ error: "NEIS API 호출에 실패했습니다.", detail: String(err) });
+  }
+};

@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>한국구화학교 학사일정</title>
+<style>
+  :root {
+    --primary: #1d4ed8;
+    --bg: #f8fafc;
+    --card: #ffffff;
+    --border: #e2e8f0;
+    --text: #1e293b;
+    --muted: #64748b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Segoe UI", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  header {
+    background: var(--primary);
+    color: #fff;
+    padding: 24px 20px;
+    text-align: center;
+  }
+  header h1 { margin: 0 0 6px; font-size: 22px; }
+  header p { margin: 0; opacity: 0.85; font-size: 14px; }
+  main {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+  .controls {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    margin-bottom: 20px;
+  }
+  .controls button {
+    border: 1px solid var(--border);
+    background: var(--card);
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+  .controls button.active {
+    background: var(--primary);
+    color: #fff;
+    border-color: var(--primary);
+  }
+  .status { text-align: center; color: var(--muted); padding: 40px 0; }
+  .month-group { margin-bottom: 18px; }
+  .month-title {
+    font-weight: 700;
+    color: var(--primary);
+    margin: 18px 0 8px;
+    font-size: 15px;
+  }
+  .event-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  .event-date {
+    flex: 0 0 56px;
+    text-align: center;
+    color: var(--primary);
+    font-weight: 700;
+    line-height: 1.2;
+  }
+  .event-date small { display: block; color: var(--muted); font-weight: 400; font-size: 11px; }
+  .event-body { flex: 1; }
+  .event-name { font-weight: 600; margin-bottom: 2px; }
+  .event-meta { font-size: 12px; color: var(--muted); }
+  footer {
+    text-align: center;
+    color: var(--muted);
+    font-size: 12px;
+    padding: 30px 0;
+  }
+</style>
+</head>
+<body>
+  <header>
+    <h1>한국구화학교 학사일정</h1>
+    <p id="schoolYearLabel">불러오는 중...</p>
+  </header>
+  <main>
+    <div class="controls" id="yearControls"></div>
+    <div id="content" class="status">학사일정을 불러오는 중입니다...</div>
+  </main>
+  <footer>데이터 출처: 나이스(NEIS) 교육정보 개방 포털</footer>
+
+  <script>
+    const contentEl = document.getElementById("content");
+    const yearControlsEl = document.getElementById("yearControls");
+    const yearLabelEl = document.getElementById("schoolYearLabel");
+
+    const now = new Date();
+    const years = [now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1];
+    let currentYear = now.getFullYear();
+
+    function renderYearButtons() {
+      yearControlsEl.innerHTML = "";
+      years.forEach((y) => {
+        const btn = document.createElement("button");
+        btn.textContent = `${y}년`;
+        if (y === currentYear) btn.classList.add("active");
+        btn.addEventListener("click", () => {
+          currentYear = y;
+          renderYearButtons();
+          loadSchedule(y);
+        });
+        yearControlsEl.appendChild(btn);
+      });
+    }
+
+    function formatDate(ymd) {
+      const y = ymd.slice(0, 4);
+      const m = parseInt(ymd.slice(4, 6), 10);
+      const d = parseInt(ymd.slice(6, 8), 10);
+      return { m, d, y };
+    }
+
+    function renderEvents(events, year) {
+      if (!events.length) {
+        contentEl.className = "status";
+        contentEl.textContent = `${year}년에 등록된 학사일정이 없습니다.`;
+        return;
+      }
+      contentEl.className = "";
+      contentEl.innerHTML = "";
+
+      let lastMonth = null;
+      events.forEach((ev) => {
+        const { m, d } = formatDate(ev.date);
+        if (m !== lastMonth) {
+          const monthTitle = document.createElement("div");
+          monthTitle.className = "month-title";
+          monthTitle.textContent = `${m}월`;
+          contentEl.appendChild(monthTitle);
+          lastMonth = m;
+        }
+
+        const card = document.createElement("div");
+        card.className = "event-card";
+        card.innerHTML = `
+          <div class="event-date">${d}<small>${m}월</small></div>
+          <div class="event-body">
+            <div class="event-name">${ev.name}</div>
+            <div class="event-meta">${ev.type || ""}${ev.content ? " · " + ev.content : ""}</div>
+          </div>
+        `;
+        contentEl.appendChild(card);
+      });
+    }
+
+    async function loadSchedule(year) {
+      contentEl.className = "status";
+      contentEl.textContent = "학사일정을 불러오는 중입니다...";
+      yearLabelEl.textContent = `${year}년 학사일정`;
+      try {
+        const res = await fetch(`/api/schedule?year=${year}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "요청 실패");
+        renderEvents(data.events || [], year);
+      } catch (err) {
+        contentEl.className = "status";
+        contentEl.textContent = "학사일정을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.";
+      }
+    }
+
+    renderYearButtons();
+    loadSchedule(currentYear);
+  </script>
+</body>
+</html>
