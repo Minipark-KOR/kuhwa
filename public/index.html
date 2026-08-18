@@ -259,6 +259,13 @@
         daysGrid.appendChild(cell);
       }
 
+      const trailingCount = (7 - ((firstWeekday + totalDays) % 7)) % 7;
+      for (let i = 0; i < trailingCount; i++) {
+        const cell = document.createElement("div");
+        cell.className = "day-cell empty";
+        daysGrid.appendChild(cell);
+      }
+
       cal.appendChild(daysGrid);
       contentEl.innerHTML = "";
       contentEl.appendChild(cal);
