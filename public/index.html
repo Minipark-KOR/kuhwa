@@ -190,7 +190,8 @@
     function renderCalendar(year, month, events) {
       contentEl.className = "";
       monthLabelEl.textContent = `${year}년 ${month}월`;
-      yearLabelEl.textContent = `${year}년 학사일정`;
+      const schoolYear = month >= 3 ? year : year - 1;
+      yearLabelEl.textContent = `${schoolYear}학년도 한국구화학교 학사일정`;
 
       const firstWeekday = new Date(Date.UTC(year, month - 1, 1)).getUTCDay(); // 0=일
       const totalDays = daysInMonth(year, month);
