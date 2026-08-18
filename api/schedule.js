@@ -13,9 +13,11 @@ module.exports = async (req, res) => {
     return;
   }
 
-  const { year, from, to } = req.query || {};
+  const { year } = req.query || {};
   const targetYear = year || String(new Date().getFullYear());
 
+  // NEIS SchoolSchedule API는 AY 파라미터를 제대로 필터링하지 않으므로
+  // AA_FROM_YMD / AA_TO_YMD(연도 범위)로 직접 필터링합니다.
   const params = new URLSearchParams({
     KEY: apiKey,
     Type: "json",
@@ -23,11 +25,9 @@ module.exports = async (req, res) => {
     pSize: "1000",
     ATPT_OFCDC_SC_CODE,
     SD_SCHUL_CODE,
-    AY: targetYear,
+    AA_FROM_YMD: `${targetYear}0101`,
+    AA_TO_YMD: `${targetYear}1231`,
   });
-
-  if (from) params.set("AA_FROM_YMD", from);
-  if (to) params.set("AA_TO_YMD", to);
 
   const url = `https://open.neis.go.kr/hub/SchoolSchedule?${params.toString()}`;
 
