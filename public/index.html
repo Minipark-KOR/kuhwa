@@ -119,6 +119,17 @@
     background: #fee2e2;
     color: #991b1b;
   }
+  .leave-note {
+    margin-top: 14px;
+    text-align: center;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--primary);
+    background: #eff6ff;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px;
+  }
   footer {
     text-align: center;
     color: var(--muted);
@@ -219,6 +230,8 @@
       const daysGrid = document.createElement("div");
       daysGrid.className = "days";
 
+      let workdayCount = 0;
+
       for (let i = 0; i < firstWeekday; i++) {
         const cell = document.createElement("div");
         cell.className = "day-cell empty";
@@ -247,9 +260,13 @@
         // 방학 등과 중복되더라도 일요일은 항상 "휴업일"로 표시합니다.
         const weekOffEvents = [];
         if (weekday === 0) weekOffEvents.push({ name: "일요일", type: "휴업일" });
+        const isHolidayEvent = (ev) => (ev.type || "").includes("공휴일") || (ev.type || "").includes("휴업일");
+        if (weekday !== 0 && weekday !== 6 && !dayEvents.some(isHolidayEvent)) {
+          workdayCount += 1;
+        }
         [...weekOffEvents, ...dayEvents].forEach((ev) => {
           const chip = document.createElement("div");
-          const isHoliday = (ev.type || "").includes("공휴일") || (ev.type || "").includes("휴업일");
+          const isHoliday = isHolidayEvent(ev);
           chip.className = "event-chip" + (isHoliday ? " holiday" : "");
           chip.textContent = ev.name;
           chip.title = `${ev.name}${ev.type ? " (" + ev.type + ")" : ""}`;
@@ -267,8 +284,15 @@
       }
 
       cal.appendChild(daysGrid);
+
+      const maxLeaveDays = Math.max(workdayCount - 15, 0);
+      const leaveNote = document.createElement("div");
+      leaveNote.className = "leave-note";
+      leaveNote.textContent = `당월 최대 연가 사용일: ${maxLeaveDays}회`;
+
       contentEl.innerHTML = "";
       contentEl.appendChild(cal);
+      contentEl.appendChild(leaveNote);
     }
 
     async function loadMonth(year, month) {
