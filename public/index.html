@@ -242,7 +242,13 @@
         cell.appendChild(num);
 
         const dayEvents = eventsByDay.get(d) || [];
-        dayEvents.forEach((ev) => {
+        // 나이스 학사일정에는 토요휴업일/공휴일/방학은 매일 등록되어 있지만
+        // 일요일은 별도 이벤트가 없는 경우가 많아 표시되지 않습니다.
+        // 방학 등과 중복되더라도 일요일/토요일/공휴일은 항상 "휴업일"로 표시합니다.
+        const weekOffEvents = [];
+        if (weekday === 0) weekOffEvents.push({ name: "일요일", type: "휴업일" });
+        if (weekday === 6) weekOffEvents.push({ name: "토요일", type: "휴업일" });
+        [...weekOffEvents, ...dayEvents].forEach((ev) => {
           const chip = document.createElement("div");
           const isHoliday = (ev.type || "").includes("공휴일") || (ev.type || "").includes("휴업일");
           chip.className = "event-chip" + (isHoliday ? " holiday" : "");
