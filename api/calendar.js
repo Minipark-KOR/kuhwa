@@ -1,11 +1,29 @@
 // /api/calendar.js
 // Vercel Serverless Function
-// 한국구화학교(NEIS) 학사일정을 iCalendar(.ics) 형식으로 반환합니다.
+// 한국구화학교 학사일정을 iCalendar(.ics) 형식으로 반환합니다.
 // 구글 캘린더 등에서 "URL로 캘린더 추가" 기능으로 구독하면 자동으로 동기화됩니다.
+//
+// 매일 KST 07:00 GitHub Actions(scripts/fetch-schedule.js)가 생성해두는
+// public/data/{year}.json 정적 파일을 우선 사용합니다(웹 달력과 동일한 소스 → 데이터 일치, 응답 속도 개선).
+// 해당 연도 파일이 없을 경우에만 NEIS API를 직접 호출하는 방식으로 폴백합니다.
+
+const fs = require("fs");
+const path = require("path");
 
 const ATPT_OFCDC_SC_CODE = "B10"; // 서울특별시교육청
 const SD_SCHUL_CODE = "7010473"; // 한국구화학교
 const PAGE_SIZE = 1000;
+
+function readStaticYear(year) {
+  try {
+    const filePath = path.join(__dirname, "..", "public", "data", `${year}.json`);
+    const raw = fs.readFileSync(filePath, "utf-8");
+    const data = JSON.parse(raw);
+    return data.events || null;
+  } catch {
+    return null;
+  }
+}
 
 async function fetchYearRows(apiKey, year) {
   const rows = [];
@@ -42,6 +60,33 @@ async function fetchYearRows(apiKey, year) {
   return rows;
 }
 
+// NEIS 원본 row를 정적 파일의 이벤트 형식({date, name, content, type})으로 변환합니다.
+function rowsToEvents(rows) {
+  const merged = new Map();
+  for (const row of rows) {
+    const key = `${row.AA_YMD}_${row.EVENT_NM}`;
+    if (!merged.has(key)) {
+      merged.set(key, {
+        date: row.AA_YMD,
+        name: row.EVENT_NM,
+        content: (row.EVENT_CNTNT || "").trim(),
+        type: row.SBTR_DD_SC_NM,
+      });
+    }
+  }
+  return Array.from(merged.values());
+}
+
+async function getYearEvents(apiKey, year) {
+  const staticEvents = readStaticYear(year);
+  if (staticEvents) return staticEvents;
+  if (!apiKey) {
+    throw new Error(`${year}년 정적 데이터가 없고 NEIS_API_KEY 환경변수도 설정되어 있지 않습니다.`);
+  }
+  const rows = await fetchYearRows(apiKey, year);
+  return rowsToEvents(rows);
+}
+
 function escapeIcsText(text) {
   return String(text || "")
     .replace(/\\/g, "\\\\")
@@ -60,34 +105,22 @@ function nextDayYmd(ymd) {
 }
 
 module.exports = async (req, res) => {
-  const apiKey = process.env.NEIS_API_KEY;
-
-  if (!apiKey) {
-    res.status(500).json({ error: "NEIS_API_KEY 환경변수가 설정되어 있지 않습니다." });
-    return;
-  }
+  // 정적 파일(public/data/{year}.json)이 이미 준비돼 있으면 NEIS_API_KEY 없이도 동작합니다.
+  const apiKey = process.env.NEIS_API_KEY || null;
 
   const nowYear = new Date().getFullYear();
   const years = [nowYear - 1, nowYear, nowYear + 1];
 
   try {
-    const allRows = [];
-    for (const year of years) {
-      const rows = await fetchYearRows(apiKey, year);
-      allRows.push(...rows);
-    }
+    const yearEventsList = await Promise.all(years.map((year) => getYearEvents(apiKey, year)));
 
-    // 같은 날짜/행사명이 학교급(초/중/고 등)별로 중복 등록되므로 날짜+행사명 기준으로 합칩니다.
+    // 정적 파일은 이미 날짜+행사명 기준으로 병합되어 있지만, 폴백(실시간 NEIS) 경로와
+    // 연도 간 중복 가능성에 대비해 다시 한번 날짜+행사명 기준으로 합칩니다.
     const merged = new Map();
-    for (const row of allRows) {
-      const key = `${row.AA_YMD}_${row.EVENT_NM}`;
-      if (!merged.has(key)) {
-        merged.set(key, {
-          date: row.AA_YMD,
-          name: row.EVENT_NM,
-          content: (row.EVENT_CNTNT || "").trim(),
-          type: row.SBTR_DD_SC_NM,
-        });
+    for (const events of yearEventsList) {
+      for (const ev of events) {
+        const key = `${ev.date}_${ev.name}`;
+        if (!merged.has(key)) merged.set(key, ev);
       }
     }
 
