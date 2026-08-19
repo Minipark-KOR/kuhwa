@@ -71,27 +71,37 @@ module.exports = async (req, res) => {
       return;
     }
 
-    // 같은 날짜/행사명이 학교급(초/중/고 등)별로 중복 등록되므로 날짜+행사명 기준으로 합칩니다.
-    const merged = new Map();
-    for (const row of rows) {
-      const key = `${row.AA_YMD}_${row.EVENT_NM}`;
-      if (!merged.has(key)) {
-        merged.set(key, {
-          date: row.AA_YMD,
-          name: row.EVENT_NM,
-          content: (row.EVENT_CNTNT || "").trim(),
-          type: row.SBTR_DD_SC_NM,
-          courses: [row.SCHUL_CRSE_SC_NM].filter(Boolean),
-        });
-      } else {
-        const existing = merged.get(key);
-        if (row.SCHUL_CRSE_SC_NM && !existing.courses.includes(row.SCHUL_CRSE_SC_NM)) {
-          existing.courses.push(row.SCHUL_CRSE_SC_NM);
-        }
-      }
-    }
+    // 같은 날짜/행사명이 학교급(초/중/고 등)별로 중복 등록되어 있어도 모두 보여주도록,
+    // 아래 중복 제거(병합) 로직은 주석 처리했습니다. 필요 시 다시 활성화해서 사용할 수 있습니다.
+    // const merged = new Map();
+    // for (const row of rows) {
+    //   const key = `${row.AA_YMD}_${row.EVENT_NM}`;
+    //   if (!merged.has(key)) {
+    //     merged.set(key, {
+    //       date: row.AA_YMD,
+    //       name: row.EVENT_NM,
+    //       content: (row.EVENT_CNTNT || "").trim(),
+    //       type: row.SBTR_DD_SC_NM,
+    //       courses: [row.SCHUL_CRSE_SC_NM].filter(Boolean),
+    //     });
+    //   } else {
+    //     const existing = merged.get(key);
+    //     if (row.SCHUL_CRSE_SC_NM && !existing.courses.includes(row.SCHUL_CRSE_SC_NM)) {
+    //       existing.courses.push(row.SCHUL_CRSE_SC_NM);
+    //     }
+    //   }
+    // }
+    // const events = Array.from(merged.values()).sort((a, b) => a.date.localeCompare(b.date));
 
-    const events = Array.from(merged.values()).sort((a, b) => a.date.localeCompare(b.date));
+    const events = rows
+      .map((row) => ({
+        date: row.AA_YMD,
+        name: row.EVENT_NM,
+        content: (row.EVENT_CNTNT || "").trim(),
+        type: row.SBTR_DD_SC_NM,
+        courses: [row.SCHUL_CRSE_SC_NM].filter(Boolean),
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date));
 
     res.setHeader("Cache-Control", "s-maxage=21600, stale-while-revalidate=86400");
     res.status(200).json({ school: "한국구화학교", year: targetYear, events });

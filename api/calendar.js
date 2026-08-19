@@ -61,20 +61,30 @@ async function fetchYearRows(apiKey, year) {
 }
 
 // NEIS 원본 row를 정적 파일의 이벤트 형식({date, name, content, type})으로 변환합니다.
+// 학교급(초/중/고 등)별로 중복 등록되는 항목을 날짜+행사명 기준으로 합치던 로직은
+// 모든 일정을 그대로 보여주기 위해 주석 처리했습니다. 필요 시 다시 활성화할 수 있습니다.
+// function rowsToEvents(rows) {
+//   const merged = new Map();
+//   for (const row of rows) {
+//     const key = `${row.AA_YMD}_${row.EVENT_NM}`;
+//     if (!merged.has(key)) {
+//       merged.set(key, {
+//         date: row.AA_YMD,
+//         name: row.EVENT_NM,
+//         content: (row.EVENT_CNTNT || "").trim(),
+//         type: row.SBTR_DD_SC_NM,
+//       });
+//     }
+//   }
+//   return Array.from(merged.values());
+// }
 function rowsToEvents(rows) {
-  const merged = new Map();
-  for (const row of rows) {
-    const key = `${row.AA_YMD}_${row.EVENT_NM}`;
-    if (!merged.has(key)) {
-      merged.set(key, {
-        date: row.AA_YMD,
-        name: row.EVENT_NM,
-        content: (row.EVENT_CNTNT || "").trim(),
-        type: row.SBTR_DD_SC_NM,
-      });
-    }
-  }
-  return Array.from(merged.values());
+  return rows.map((row) => ({
+    date: row.AA_YMD,
+    name: row.EVENT_NM,
+    content: (row.EVENT_CNTNT || "").trim(),
+    type: row.SBTR_DD_SC_NM,
+  }));
 }
 
 async function getYearEvents(apiKey, year) {
