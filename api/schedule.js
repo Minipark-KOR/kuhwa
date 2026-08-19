@@ -14,7 +14,12 @@ module.exports = async (req, res) => {
   }
 
   const { year } = req.query || {};
-  const targetYear = year || String(new Date().getFullYear());
+  const targetYear = year ? String(year) : String(new Date().getFullYear());
+
+  if (!/^\d{4}$/.test(targetYear)) {
+    res.status(400).json({ error: "year 파라미터는 4자리 숫자여야 합니다." });
+    return;
+  }
 
   // NEIS SchoolSchedule API는 AY 파라미터를 제대로 필터링하지 않으므로
   // AA_FROM_YMD / AA_TO_YMD(연도 범위)로 직접 필터링합니다.
@@ -91,6 +96,7 @@ module.exports = async (req, res) => {
     res.setHeader("Cache-Control", "s-maxage=21600, stale-while-revalidate=86400");
     res.status(200).json({ school: "한국구화학교", year: targetYear, events });
   } catch (err) {
-    res.status(502).json({ error: "NEIS API 호출에 실패했습니다.", detail: String(err) });
+    console.error("[api/schedule] NEIS API 호출 실패:", err);
+    res.status(502).json({ error: "NEIS API 호출에 실패했습니다." });
   }
 };

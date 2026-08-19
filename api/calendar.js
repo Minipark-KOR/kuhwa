@@ -166,6 +166,7 @@ module.exports = async (req, res) => {
     res.setHeader("Cache-Control", "s-maxage=3600, stale-while-revalidate");
     res.status(200).send(body);
   } catch (err) {
-    res.status(502).json({ error: "NEIS API 호출에 실패했습니다.", detail: String(err) });
+    console.error("[api/calendar] NEIS API 호출 실패:", err);
+    res.status(502).json({ error: "NEIS API 호출에 실패했습니다." });
   }
 };
