@@ -89,6 +89,13 @@
     background: var(--card);
   }
   .cal-sub-btn:hover { background: #eef2ff; }
+  .cal-sub-note {
+    text-align: center;
+    font-size: 11px;
+    color: var(--muted);
+    margin: -6px 0 16px;
+    line-height: 1.5;
+  }
   .status { text-align: center; color: var(--muted); padding: 40px 0; }
   .calendar {
     background: var(--card);
@@ -194,6 +201,7 @@
       <a id="gcalBtn" class="cal-sub-btn" target="_blank" rel="noopener">구글 캘린더에 추가</a>
       <a id="icsBtn" class="cal-sub-btn" target="_blank" rel="noopener">ICS 파일 구독 링크</a>
     </div>
+    <p class="cal-sub-note">구독 후 구글 캘린더에 일정이 보이려면 구글 서버가 최초 동기화를 완료할 때까지(최대 24시간) 시간이 걸릴 수 있습니다. 바로 보이지 않으면 구글 캘린더 &gt; 설정 &gt; 다른 캘린더 추가 &gt; URL로 추가에 ICS 링크를 직접 입력해보세요.</p>
     <div id="content" class="status">학사일정을 불러오는 중입니다...</div>
   </main>
   <footer>데이터 출처: 나이스(NEIS) 교육정보 개방 포털</footer>
@@ -210,7 +218,8 @@
 
     const icsUrl = window.location.origin + "/api/calendar.ics";
     icsBtn.href = icsUrl;
-    gcalBtn.href = "https://calendar.google.com/calendar/render?cid=" + encodeURIComponent(icsUrl);
+    const webcalUrl = icsUrl.replace(/^https?:\/\//, "webcal://");
+    gcalBtn.href = "https://calendar.google.com/calendar/render?cid=" + encodeURIComponent(webcalUrl);
 
     // 현재 한국(KST, UTC+9) 기준 날짜를 계산합니다.
     function getKstNow() {
