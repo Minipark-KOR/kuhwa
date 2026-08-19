@@ -67,11 +67,6 @@
     white-space: nowrap;
     flex-shrink: 0;
   }
-  .today-btn {
-    font-size: 12px !important;
-    color: var(--primary);
-    border-color: var(--primary) !important;
-  }
   .cal-sub {
     display: flex;
     flex-wrap: wrap;
@@ -188,7 +183,6 @@
       <button id="prevBtn">‹ 이전달</button>
       <div class="month-label" id="monthLabel">-</div>
       <button id="nextBtn">다음달 ›</button>
-      <button id="todayBtn" class="today-btn">오늘</button>
     </div>
     <div class="cal-sub">
       <a id="gcalBtn" class="cal-sub-btn" target="_blank" rel="noopener">구글 캘린더에 추가</a>
@@ -204,7 +198,6 @@
     const yearLabelEl = document.getElementById("schoolYearLabel");
     const prevBtn = document.getElementById("prevBtn");
     const nextBtn = document.getElementById("nextBtn");
-    const todayBtn = document.getElementById("todayBtn");
     const gcalBtn = document.getElementById("gcalBtn");
     const icsBtn = document.getElementById("icsBtn");
 
@@ -363,11 +356,6 @@
     nextBtn.addEventListener("click", () => {
       viewMonth += 1;
       if (viewMonth > 12) { viewMonth = 1; viewYear += 1; }
-      loadMonth(viewYear, viewMonth);
-    });
-    todayBtn.addEventListener("click", () => {
-      viewYear = todayYear;
-      viewMonth = todayMonth;
       loadMonth(viewYear, viewMonth);
     });
 
