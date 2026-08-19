@@ -72,6 +72,23 @@
     color: var(--primary);
     border-color: var(--primary) !important;
   }
+  .cal-sub {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px 12px;
+    margin-bottom: 16px;
+  }
+  .cal-sub-btn {
+    font-size: 12px;
+    color: var(--primary);
+    text-decoration: none;
+    border: 1px solid var(--primary);
+    border-radius: 8px;
+    padding: 6px 10px;
+    background: var(--card);
+  }
+  .cal-sub-btn:hover { background: #eef2ff; }
   .status { text-align: center; color: var(--muted); padding: 40px 0; }
   .calendar {
     background: var(--card);
@@ -173,6 +190,10 @@
       <button id="nextBtn">다음달 ›</button>
       <button id="todayBtn" class="today-btn">오늘</button>
     </div>
+    <div class="cal-sub">
+      <a id="gcalBtn" class="cal-sub-btn" target="_blank" rel="noopener">구글 캘린더에 추가</a>
+      <a id="icsBtn" class="cal-sub-btn" target="_blank" rel="noopener">ICS 파일 구독 링크</a>
+    </div>
     <div id="content" class="status">학사일정을 불러오는 중입니다...</div>
   </main>
   <footer>데이터 출처: 나이스(NEIS) 교육정보 개방 포털</footer>
@@ -184,6 +205,12 @@
     const prevBtn = document.getElementById("prevBtn");
     const nextBtn = document.getElementById("nextBtn");
     const todayBtn = document.getElementById("todayBtn");
+    const gcalBtn = document.getElementById("gcalBtn");
+    const icsBtn = document.getElementById("icsBtn");
+
+    const icsUrl = window.location.origin + "/api/calendar.ics";
+    icsBtn.href = icsUrl;
+    gcalBtn.href = "https://calendar.google.com/calendar/render?cid=" + encodeURIComponent(icsUrl);
 
     // 현재 한국(KST, UTC+9) 기준 날짜를 계산합니다.
     function getKstNow() {
