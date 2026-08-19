@@ -184,10 +184,6 @@
       <div class="month-label" id="monthLabel">-</div>
       <button id="nextBtn">다음달 ›</button>
     </div>
-    <div class="cal-sub">
-      <a id="gcalBtn" class="cal-sub-btn" target="_blank" rel="noopener">구글 캘린더에 추가</a>
-      <a id="icsBtn" class="cal-sub-btn" target="_blank" rel="noopener">ICS 파일 구독 링크</a>
-    </div>
     <div id="content" class="status">학사일정을 불러오는 중입니다...</div>
   </main>
   <footer>데이터 출처: 나이스(NEIS) 교육정보 개방 포털</footer>
@@ -198,13 +194,9 @@
     const yearLabelEl = document.getElementById("schoolYearLabel");
     const prevBtn = document.getElementById("prevBtn");
     const nextBtn = document.getElementById("nextBtn");
-    const gcalBtn = document.getElementById("gcalBtn");
-    const icsBtn = document.getElementById("icsBtn");
-
     const icsUrl = window.location.origin + "/api/calendar.ics";
-    icsBtn.href = icsUrl;
     const webcalUrl = icsUrl.replace(/^https?:\/\//, "webcal://");
-    gcalBtn.href = "https://calendar.google.com/calendar/render?cid=" + encodeURIComponent(webcalUrl);
+    const gcalUrl = "https://calendar.google.com/calendar/render?cid=" + encodeURIComponent(webcalUrl);
 
     // 현재 한국(KST, UTC+9) 기준 날짜를 계산합니다.
     function getKstNow() {
@@ -341,9 +333,29 @@
       leaveNote.className = "leave-note";
       leaveNote.textContent = `당월 최대 연가 사용: ${maxLeaveDays}회`;
 
+      const calSub = document.createElement("div");
+      calSub.className = "cal-sub";
+      const gcalBtn = document.createElement("a");
+      gcalBtn.id = "gcalBtn";
+      gcalBtn.className = "cal-sub-btn";
+      gcalBtn.target = "_blank";
+      gcalBtn.rel = "noopener";
+      gcalBtn.href = gcalUrl;
+      gcalBtn.textContent = "구글 캘린더에 추가";
+      const icsBtn = document.createElement("a");
+      icsBtn.id = "icsBtn";
+      icsBtn.className = "cal-sub-btn";
+      icsBtn.target = "_blank";
+      icsBtn.rel = "noopener";
+      icsBtn.href = icsUrl;
+      icsBtn.textContent = "ICS 파일 구독 링크";
+      calSub.appendChild(gcalBtn);
+      calSub.appendChild(icsBtn);
+
       contentEl.innerHTML = "";
       contentEl.appendChild(cal);
       contentEl.appendChild(leaveNote);
+      contentEl.appendChild(calSub);
     }
 
     async function loadMonth(year, month) {
