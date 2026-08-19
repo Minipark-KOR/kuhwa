@@ -1,0 +1,35 @@
+name: Update NEIS schedule data
+
+on:
+  schedule:
+    - cron: "0 22 * * *"  # 매일 KST 07:00 (UTC 22:00)
+  workflow_dispatch: {}
+
+jobs:
+  update-schedule:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Fetch NEIS schedule
+        env:
+          NEIS_API_KEY: ${{ secrets.NEIS_API_KEY }}
+        run: node scripts/fetch-schedule.js
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add public/data
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "chore: update NEIS schedule data"
+            git push
+          fi

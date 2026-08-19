@@ -21,11 +21,7 @@ module.exports = async (req, res) => {
   const PAGE_SIZE = 1000;
 
   try {
-    const rows = [];
-    let pIndex = 1;
-    let totalCount = null;
-
-    while (totalCount === null || rows.length < totalCount) {
+    const buildUrl = (pIndex) => {
       const params = new URLSearchParams({
         KEY: apiKey,
         Type: "json",
@@ -36,27 +32,36 @@ module.exports = async (req, res) => {
         AA_FROM_YMD: `${targetYear}0101`,
         AA_TO_YMD: `${targetYear}1231`,
       });
+      return `https://open.neis.go.kr/hub/SchoolSchedule?${params.toString()}`;
+    };
 
-      const url = `https://open.neis.go.kr/hub/SchoolSchedule?${params.toString()}`;
-      const response = await fetch(url);
+    const fetchPage = async (pIndex) => {
+      const response = await fetch(buildUrl(pIndex));
       const data = await response.json();
-
       const sched = data?.SchoolSchedule;
-      if (!sched) {
-        // 해당 데이터가 없는 경우 (RESULT INFO-200 등)
-        break;
+      if (!sched) return { totalCount: 0, rows: [] };
+      const totalCount = sched[0]?.head?.[0]?.list_total_count ?? 0;
+      const rows = sched[1]?.row || [];
+      return { totalCount, rows };
+    };
+
+    // 첫 페이지로 전체 건수를 파악한 뒤, 남은 페이지는 병렬로 가져와 지연을 줄입니다.
+    const first = await fetchPage(1);
+    let rows = [...first.rows];
+    const totalCount = first.totalCount;
+    const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+
+    if (totalPages > 1) {
+      const remainingPages = await Promise.all(
+        Array.from({ length: totalPages - 1 }, (_, i) => fetchPage(i + 2))
+      );
+      for (const page of remainingPages) {
+        rows.push(...page.rows);
       }
-
-      totalCount = sched[0]?.head?.[0]?.list_total_count ?? 0;
-      const pageRows = sched[1]?.row || [];
-      rows.push(...pageRows);
-
-      if (pageRows.length === 0) break; // 안전장치: 무한루프 방지
-      pIndex += 1;
     }
 
     if (rows.length === 0) {
-      res.setHeader("Cache-Control", "s-maxage=3600, stale-while-revalidate");
+      res.setHeader("Cache-Control", "s-maxage=21600, stale-while-revalidate=86400");
       res.status(200).json({ school: "한국구화학교", year: targetYear, events: [] });
       return;
     }
@@ -83,7 +88,7 @@ module.exports = async (req, res) => {
 
     const events = Array.from(merged.values()).sort((a, b) => a.date.localeCompare(b.date));
 
-    res.setHeader("Cache-Control", "s-maxage=3600, stale-while-revalidate");
+    res.setHeader("Cache-Control", "s-maxage=21600, stale-while-revalidate=86400");
     res.status(200).json({ school: "한국구화학교", year: targetYear, events });
   } catch (err) {
     res.status(502).json({ error: "NEIS API 호출에 실패했습니다.", detail: String(err) });

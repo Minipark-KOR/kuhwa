@@ -1,0 +1,102 @@
+// scripts/fetch-schedule.js
+// NEIS 학사일정을 미리 가져와 public/data/{year}.json 정적 파일로 저장합니다.
+// GitHub Actions가 매일 새벽(KST 07:00) 이 스크립트를 실행해 커밋합니다.
+
+const fs = require("fs");
+const path = require("path");
+
+const ATPT_OFCDC_SC_CODE = "B10"; // 서울특별시교육청
+const SD_SCHUL_CODE = "7010473"; // 한국구화학교
+const PAGE_SIZE = 1000;
+
+async function fetchPage(apiKey, year, pIndex) {
+  const params = new URLSearchParams({
+    KEY: apiKey,
+    Type: "json",
+    pIndex: String(pIndex),
+    pSize: String(PAGE_SIZE),
+    ATPT_OFCDC_SC_CODE,
+    SD_SCHUL_CODE,
+    AA_FROM_YMD: `${year}0101`,
+    AA_TO_YMD: `${year}1231`,
+  });
+  const url = `https://open.neis.go.kr/hub/SchoolSchedule?${params.toString()}`;
+  const response = await fetch(url);
+  const data = await response.json();
+  const sched = data?.SchoolSchedule;
+  if (!sched) return { totalCount: 0, rows: [] };
+  const totalCount = sched[0]?.head?.[0]?.list_total_count ?? 0;
+  const rows = sched[1]?.row || [];
+  return { totalCount, rows };
+}
+
+async function fetchYearEvents(apiKey, year) {
+  const first = await fetchPage(apiKey, year, 1);
+  let rows = [...first.rows];
+  const totalPages = Math.ceil(first.totalCount / PAGE_SIZE);
+
+  if (totalPages > 1) {
+    const remainingPages = await Promise.all(
+      Array.from({ length: totalPages - 1 }, (_, i) => fetchPage(apiKey, year, i + 2))
+    );
+    for (const page of remainingPages) {
+      rows.push(...page.rows);
+    }
+  }
+
+  // 같은 날짜/행사명이 학교급(초/중/고 등)별로 중복 등록되므로 날짜+행사명 기준으로 합칩니다.
+  const merged = new Map();
+  for (const row of rows) {
+    const key = `${row.AA_YMD}_${row.EVENT_NM}`;
+    if (!merged.has(key)) {
+      merged.set(key, {
+        date: row.AA_YMD,
+        name: row.EVENT_NM,
+        content: (row.EVENT_CNTNT || "").trim(),
+        type: row.SBTR_DD_SC_NM,
+        courses: [row.SCHUL_CRSE_SC_NM].filter(Boolean),
+      });
+    } else {
+      const existing = merged.get(key);
+      if (row.SCHUL_CRSE_SC_NM && !existing.courses.includes(row.SCHUL_CRSE_SC_NM)) {
+        existing.courses.push(row.SCHUL_CRSE_SC_NM);
+      }
+    }
+  }
+
+  return Array.from(merged.values()).sort((a, b) => a.date.localeCompare(b.date));
+}
+
+async function main() {
+  const apiKey = process.env.NEIS_API_KEY;
+  if (!apiKey) {
+    console.error("NEIS_API_KEY 환경변수가 설정되어 있지 않습니다.");
+    process.exit(1);
+  }
+
+  const nowYear = new Date().getFullYear();
+  const years = [nowYear - 1, nowYear, nowYear + 1];
+
+  const outDir = path.join(__dirname, "..", "public", "data");
+  fs.mkdirSync(outDir, { recursive: true });
+
+  const results = await Promise.all(years.map((year) => fetchYearEvents(apiKey, year)));
+
+  years.forEach((year, i) => {
+    const events = results[i];
+    const outPath = path.join(outDir, `${year}.json`);
+    const payload = {
+      school: "한국구화학교",
+      year: String(year),
+      updatedAt: new Date().toISOString(),
+      events,
+    };
+    fs.writeFileSync(outPath, JSON.stringify(payload, null, 2));
+    console.log(`wrote ${outPath} (${events.length} events)`);
+  });
+}
+
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
