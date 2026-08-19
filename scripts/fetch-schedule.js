@@ -4,6 +4,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const nodemailer = require("nodemailer");
 
 const ATPT_OFCDC_SC_CODE = "B10"; // 서울특별시교육청
 const SD_SCHUL_CODE = "7010473"; // 한국구화학교
@@ -23,6 +24,14 @@ async function fetchPage(apiKey, year, pIndex) {
   const url = `https://open.neis.go.kr/hub/SchoolSchedule?${params.toString()}`;
   const response = await fetch(url);
   const data = await response.json();
+
+  const resultCode = data?.RESULT?.CODE;
+  // NEIS는 "조회할 데이터가 없습니다"(INFO-200)는 정상 상황(빈 결과)이지만,
+  // 그 외 에러 코드(인증키 오류, 요청 제한 등)는 실제 호출 실패이므로 예외로 처리합니다.
+  if (resultCode && resultCode !== "INFO-200") {
+    throw new Error(`NEIS API 호출 실패 (${resultCode}): ${data.RESULT.MESSAGE}`);
+  }
+
   const sched = data?.SchoolSchedule;
   if (!sched) return { totalCount: 0, rows: [] };
   const totalCount = sched[0]?.head?.[0]?.list_total_count ?? 0;
@@ -67,10 +76,37 @@ async function fetchYearEvents(apiKey, year) {
   return Array.from(merged.values()).sort((a, b) => a.date.localeCompare(b.date));
 }
 
+async function sendFailureMail(error) {
+  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, MAIL_TO } = process.env;
+  if (!SMTP_HOST || !SMTP_USER || !SMTP_PASSWORD) {
+    console.error("SMTP 환경변수가 설정되어 있지 않아 실패 알림 메일을 보낼 수 없습니다.");
+    return;
+  }
+  try {
+    const transporter = nodemailer.createTransport({
+      host: SMTP_HOST,
+      port: Number(SMTP_PORT || 587),
+      secure: false,
+      auth: { user: SMTP_USER, pass: SMTP_PASSWORD },
+    });
+    await transporter.sendMail({
+      from: SMTP_USER,
+      to: MAIL_TO || SMTP_USER,
+      subject: "[kuhwa] NEIS 학사일정 갱신 실패",
+      text: `NEIS 학사일정 정기 갱신(scripts/fetch-schedule.js)이 실패했습니다.\n\n시각: ${new Date().toISOString()}\n에러: ${error?.stack || error}`,
+    });
+    console.log("실패 알림 메일을 발송했습니다.");
+  } catch (mailErr) {
+    console.error("실패 알림 메일 발송 중 오류:", mailErr);
+  }
+}
+
 async function main() {
   const apiKey = process.env.NEIS_API_KEY;
   if (!apiKey) {
-    console.error("NEIS_API_KEY 환경변수가 설정되어 있지 않습니다.");
+    const err = new Error("NEIS_API_KEY 환경변수가 설정되어 있지 않습니다.");
+    console.error(err.message);
+    await sendFailureMail(err);
     process.exit(1);
   }
 
@@ -96,7 +132,8 @@ async function main() {
   });
 }
 
-main().catch((err) => {
+main().catch(async (err) => {
   console.error(err);
+  await sendFailureMail(err);
   process.exit(1);
 });
