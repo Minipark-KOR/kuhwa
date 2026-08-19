@@ -125,7 +125,11 @@ module.exports = async (req, res) => {
     const body = lines.join("\r\n");
 
     res.setHeader("Content-Type", "text/calendar; charset=utf-8");
-    res.setHeader("Content-Disposition", "inline; filename=kuhwa-schedule.ics");
+    const filename = encodeURIComponent("한국구화학교 학사일정.ics");
+    res.setHeader(
+      "Content-Disposition",
+      `inline; filename="school-schedule.ics"; filename*=UTF-8''${filename}`
+    );
     res.setHeader("Cache-Control", "s-maxage=3600, stale-while-revalidate");
     res.status(200).send(body);
   } catch (err) {
