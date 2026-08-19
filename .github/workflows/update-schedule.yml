@@ -3,6 +3,8 @@ name: Update NEIS schedule data
 on:
   schedule:
     - cron: "0 22 * * *"  # 매일 KST 07:00 (UTC 22:00)
+    - cron: "0 3 * * *"   # 매일 KST 12:00 (UTC 03:00)
+    - cron: "0 6 * * *"   # 매일 KST 15:00 (UTC 06:00)
   workflow_dispatch: {}
 
 jobs:
