@@ -46,6 +46,13 @@ async function fetchYearRows(apiKey, year) {
     const response = await fetch(url);
     const data = await response.json();
 
+    const resultCode = data?.RESULT?.CODE;
+    // NEIS는 "조회할 데이터가 없습니다"(INFO-200)는 정상 상황(빈 결과)이지만,
+    // 그 외 에러 코드(인증키 오류, 요청 제한 등)는 실제 호출 실패이므로 예외로 처리합니다.
+    if (resultCode && resultCode !== "INFO-200") {
+      throw new Error(`NEIS API 호출 실패 (${resultCode}): ${data.RESULT.MESSAGE}`);
+    }
+
     const sched = data?.SchoolSchedule;
     if (!sched) break;
 
@@ -71,7 +78,13 @@ function rowsToEvents(rows) {
         name: row.EVENT_NM,
         content: (row.EVENT_CNTNT || "").trim(),
         type: row.SBTR_DD_SC_NM,
+        courses: [row.SCHUL_CRSE_SC_NM].filter(Boolean),
       });
+    } else {
+      const existing = merged.get(key);
+      if (row.SCHUL_CRSE_SC_NM && !existing.courses.includes(row.SCHUL_CRSE_SC_NM)) {
+        existing.courses.push(row.SCHUL_CRSE_SC_NM);
+      }
     }
   }
   return Array.from(merged.values());
@@ -146,8 +159,15 @@ module.exports = async (req, res) => {
       lines.push(`DTSTART;VALUE=DATE:${ev.date}`);
       lines.push(`DTEND;VALUE=DATE:${nextDayYmd(ev.date)}`);
       lines.push(`SUMMARY:${escapeIcsText(ev.name)}`);
-      if (ev.content) {
-        lines.push(`DESCRIPTION:${escapeIcsText(ev.content)}`);
+      if (ev.content || (ev.courses && ev.courses.length > 0)) {
+        const desc = [];
+        if (ev.courses && ev.courses.length > 0) {
+          desc.push(`학교급: ${ev.courses.join(", ")}`);
+        }
+        if (ev.content) {
+          desc.push(ev.content);
+        }
+        lines.push(`DESCRIPTION:${escapeIcsText(desc.join("\\n"))}`);
       }
       lines.push(`CATEGORIES:${escapeIcsText(ev.type || "학사일정")}`);
       lines.push("END:VEVENT");

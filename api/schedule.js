@@ -43,6 +43,14 @@ module.exports = async (req, res) => {
     const fetchPage = async (pIndex) => {
       const response = await fetch(buildUrl(pIndex));
       const data = await response.json();
+
+      const resultCode = data?.RESULT?.CODE;
+      // NEIS는 "조회할 데이터가 없습니다"(INFO-200)는 정상 상황(빈 결과)이지만,
+      // 그 외 에러 코드(인증키 오류, 요청 제한 등)는 실제 호출 실패이므로 예외로 처리합니다.
+      if (resultCode && resultCode !== "INFO-200") {
+        throw new Error(`NEIS API 호출 실패 (${resultCode}): ${data.RESULT.MESSAGE}`);
+      }
+
       const sched = data?.SchoolSchedule;
       if (!sched) return { totalCount: 0, rows: [] };
       const totalCount = sched[0]?.head?.[0]?.list_total_count ?? 0;
