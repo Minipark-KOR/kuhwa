@@ -91,9 +91,9 @@ function rowsToEvents(rows) {
 }
 
 async function getYearEvents(apiKey, year) {
-  const staticEvents = readStaticYear(year);
-  if (staticEvents) return staticEvents;
   if (!apiKey) {
+    const staticEvents = readStaticYear(year);
+    if (staticEvents) return staticEvents;
     throw new Error(`${year}년 정적 데이터가 없고 NEIS_API_KEY 환경변수도 설정되어 있지 않습니다.`);
   }
   const rows = await fetchYearRows(apiKey, year);
