@@ -1,9 +1,10 @@
 // scripts/fetch-schedule.js
 // NEIS 학사일정을 미리 가져와 public/data/{year}.json 정적 파일로 저장합니다.
-// GitHub Actions가 매일 새벽(KST 07:00) 이 스크립트를 실행해 커밋합니다.
+// Diff가 있을 때만 GitHub에 커밋/푸시합니다.
 
 const fs = require("fs");
 const path = require("path");
+const { execSync } = require("child_process");
 const nodemailer = require("nodemailer");
 
 const ATPT_OFCDC_SC_CODE = "B10"; // 서울특별시교육청
@@ -118,6 +119,7 @@ async function main() {
 
   const results = await Promise.all(years.map((year) => fetchYearEvents(apiKey, year)));
 
+  let hasChanges = false;
   years.forEach((year, i) => {
     const events = results[i];
     const outPath = path.join(outDir, `${year}.json`);
@@ -127,9 +129,37 @@ async function main() {
       updatedAt: new Date().toISOString(),
       events,
     };
-    fs.writeFileSync(outPath, JSON.stringify(payload, null, 2));
-    console.log(`wrote ${outPath} (${events.length} events)`);
+    // 기존 파일과 이벤트 데이터만 비교 (updatedAt 제외)
+    let existingEvents = null;
+    try {
+      const existing = JSON.parse(fs.readFileSync(outPath, "utf-8"));
+      existingEvents = existing.events;
+    } catch {}
+    const newEventsStr = JSON.stringify(events);
+    const existingEventsStr = JSON.stringify(existingEvents);
+    if (newEventsStr !== existingEventsStr) {
+      fs.writeFileSync(outPath, JSON.stringify(payload, null, 2));
+      console.log(`wrote ${outPath} (${events.length} events)`);
+      hasChanges = true;
+    } else {
+      console.log(`unchanged ${outPath} (${events.length} events)`);
+    }
   });
+
+  // 이벤트 데이터 변경 없으면 종료
+  if (!hasChanges) {
+    console.log("No changes to commit");
+    return;
+  }
+
+  // 커밋/푸시
+  const repoDir = path.join(__dirname, "..");
+  execSync("git add public/data", { cwd: repoDir, stdio: "inherit" });
+  execSync('git config user.name "devforge[bot]"', { cwd: repoDir });
+  execSync('git config user.email "devforge[bot]@users.noreply.github.com"', { cwd: repoDir });
+  execSync('git commit -m "chore: update NEIS schedule data"', { cwd: repoDir, stdio: "inherit" });
+  execSync("git push", { cwd: repoDir, stdio: "inherit" });
+  console.log("Pushed to GitHub");
 }
 
 main().catch(async (err) => {
