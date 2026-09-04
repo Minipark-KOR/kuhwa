@@ -102,7 +102,10 @@
   .weekdays div {
     padding: 8px 4px;
     text-align: center;
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
   }
+  .weekdays div:nth-child(7n) { border-right: none; }
   .weekdays div:first-child { color: #dc2626; }
   .weekdays div:last-child { color: #2563eb; }
   .days {
@@ -162,6 +165,8 @@
   @media (max-width: 480px) {
     header { padding: 18px 12px; }
     .day-cell { min-height: 62px; font-size: 10px; }
+    .weekdays { font-size: 10px; }
+    .weekdays div { padding: 6px 2px; }
     .event-chip { font-size: 9px; }
     .controls { gap: 8px 10px; }
     .controls button { padding: 7px 10px; font-size: 13px; }
@@ -169,6 +174,9 @@
   }
   @media (max-width: 360px) {
     header { padding: 16px 10px; }
+    .day-cell { font-size: 9px; }
+    .weekdays { font-size: 9px; }
+    .weekdays div { padding: 5px 1px; }
     .controls button { padding: 6px 8px; font-size: 12px; }
     .controls .month-label { font-size: 15px; min-width: 80px; }
   }
